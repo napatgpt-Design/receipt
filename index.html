@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Receipt Scanner</title>
+<meta name="description" content="สแกนใบเสร็จด้วย AI จัดเก็บตามบริษัท งาน ประเภท และสรุปยอดรวม">
+<meta name="theme-color" content="#F4F6FB">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="สแกนใบเสร็จ">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600&family=IBM+Plex+Sans+Thai:wght@400;500&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+:root{--pri:#4F46E5;--ink:#0F172A;--ink2:#475569;--grad:linear-gradient(160deg,#312E81,#4F46E5 45%,#0E7490)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#F4F6FB;font-family:'IBM Plex Sans Thai','Kanit',-apple-system,Tahoma,sans-serif;color:var(--ink);-webkit-text-size-adjust:100%}
+body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:env(safe-area-inset-bottom,0);background:#fff;z-index:1}
+#frame{position:fixed;left:0;top:env(safe-area-inset-top,0);width:100%;height:calc(100% - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));border:0;background:#F4F6FB;display:block}
+
+/* full-screen states: splash / offline / not configured */
+.screen{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;color:#fff;
+  background:radial-gradient(1000px 500px at 10% -10%,#818CF8 0,transparent 60%),radial-gradient(800px 500px at 110% 110%,#22D3EE 0,transparent 55%),var(--grad)}
+.screen.on{display:flex}
+.screen img{width:96px;height:96px;border-radius:24px;box-shadow:0 14px 40px rgba(0,0,0,.3);margin-bottom:18px}
+.screen h1{font-family:Kanit;font-weight:600;font-size:24px}
+.screen p{color:rgba(255,255,255,.85);font-size:14.5px;margin-top:8px;max-width:360px;line-height:1.6}
+.screen code{background:rgba(255,255,255,.18);padding:2px 6px;border-radius:6px;font-size:12.5px;word-break:break-all}
+.spin{width:30px;height:30px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;margin-top:22px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;padding:12px 22px;border-radius:14px;border:0;background:#fff;color:var(--pri);font:600 15px Kanit,sans-serif;cursor:pointer}
+.btn.ghost{background:rgba(255,255,255,.16);color:#fff}
+#slowHint{display:none}
+
+/* install banner */
+.install{position:fixed;z-index:30;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);display:none;align-items:center;gap:12px;
+  padding:12px 12px 12px 14px;border-radius:18px;background:#fff;box-shadow:0 12px 40px rgba(15,23,42,.25);border:1px solid #E2E8F0;max-width:520px;margin:0 auto;animation:drop .3s ease}
+.install.on{display:flex}
+@keyframes drop{from{transform:translateY(-20px);opacity:0}to{transform:none;opacity:1}}
+.install img{width:46px;height:46px;border-radius:12px;flex-shrink:0}
+.install .t{font-family:Kanit;font-weight:600;font-size:15px}
+.install .d{font-size:13px;color:var(--ink2);line-height:1.5;margin-top:2px}
+.install .d svg{vertical-align:-4px}
+.install .sp{flex:1;min-width:0}
+.install .go{padding:9px 16px;border-radius:12px;border:0;background:linear-gradient(135deg,#4F46E5,#7C3AED 45%,#06B6D4);color:#fff;font:600 14px Kanit,sans-serif;cursor:pointer;flex-shrink:0}
+.install .x{border:0;background:none;font-size:20px;color:#94A3B8;padding:4px 6px;cursor:pointer;align-self:flex-start}
+</style>
+</head>
+<body>
+<iframe id="frame" title="Receipt Scanner" allow="camera *; clipboard-read *; clipboard-write *; fullscreen *"></iframe>
+
+<div class="screen on" id="splash">
+  <img src="icon-512.png" alt="">
+  <h1 id="appName">Receipt Scanner</h1>
+  <p>สแกนใบเสร็จด้วย AI</p>
+  <div class="spin"></div>
+  <div id="slowHint">
+    <p>ใช้เวลานานกว่าปกติ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่</p>
+    <button class="btn" onclick="RS.reload()">ลองใหม่</button>
+  </div>
+</div>
+
+<div class="screen" id="offline">
+  <img src="icon-512.png" alt="">
+  <h1>ไม่มีการเชื่อมต่ออินเทอร์เน็ต</h1>
+  <p>แอปต้องใช้อินเทอร์เน็ตเพื่ออ่านใบเสร็จและบันทึกข้อมูล<br>เชื่อมต่อแล้วแอปจะกลับมาทำงานเอง</p>
+  <button class="btn" onclick="RS.reload()">ลองอีกครั้ง</button>
+</div>
+
+<div class="screen" id="notConfigured">
+  <img src="icon-512.png" alt="">
+  <h1>ยังไม่ได้ตั้งค่าแอป</h1>
+  <p>เปิดไฟล์ <code>config.js</code> แล้วใส่ Web App URL ของ Apps Script<br>(ลงท้ายด้วย <code>/exec</code>) ในช่อง <code>gasUrl</code></p>
+</div>
+
+<div class="install" id="install">
+  <img src="icon-192.png" alt="">
+  <div class="sp"><div class="t" id="insT">ติดตั้งแอปสแกนใบเสร็จ</div><div class="d" id="insD"></div></div>
+  <button class="go" id="insGo" style="display:none">ติดตั้ง</button>
+  <button class="x" id="insX" aria-label="ปิด">✕</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var C = window.RS_CONFIG || {};
+  var TOKEN_KEY = 'rs_token';
+  var GAS_RE = /^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[^/]+\/exec/;
+  var ORIGIN_RE = /^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/;   // where the Apps Script page runs
+  var extra = C.extraOrigins || [];
+  var $ = function (id) { return document.getElementById(id); };
+  var frame = $('frame'), loaded = false, hello = false, slowTimer = null, deferredPrompt = null;
+
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function show(id, on) { $(id).classList.toggle('on', !!on); }
+  if (C.appName) { $('appName').textContent = C.appName; document.title = C.appName; }
+
+  /* ---------- platform ---------- */
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var isAndroid = /Android/.test(ua);
+  var inApp = /Line\/|FBAN|FBAV|FB_IAB|Instagram|MicroMessenger/i.test(ua);
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+
+  /* ---------- load the Apps Script app ---------- */
+  function start() {
+    var url = String(C.gasUrl || '').trim();
+    if (!GAS_RE.test(url) && !C.allowAnyUrl) { show('splash', false); show('notConfigured', true); return; }
+    if (!navigator.onLine) { show('splash', false); show('offline', true); return; }
+    show('offline', false); show('splash', true); $('slowHint').style.display = 'none';
+    hello = false; loaded = false;
+    frame.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 'app=pwa&t=' + Date.now();
+    clearTimeout(slowTimer);
+    slowTimer = setTimeout(function () { if (!hello) $('slowHint').style.display = 'block'; }, 20000);
+  }
+  frame.addEventListener('load', function () { loaded = true; });
+  window.RS = { reload: start };
+
+  /* ---------- talk to the app inside the frame ---------- */
+  function trusted(origin) { return ORIGIN_RE.test(origin) || extra.indexOf(origin) >= 0; }
+  window.addEventListener('message', function (e) {
+    if (!trusted(e.origin)) return;
+    var d = e.data || {};
+    if (d.type === 'rs-hello') {
+      hello = true; clearTimeout(slowTimer); show('splash', false);
+      e.source.postMessage({ type: 'rs-shell', v: 1, token: load(TOKEN_KEY), standalone: standalone, ios: isIOS, android: isAndroid }, e.origin);
+    } else if (d.type === 'rs-token') {
+      store(TOKEN_KEY, d.token || null);
+    } else if (d.type === 'rs-ready') {
+      show('splash', false);
+    } else if (d.type === 'rs-reload') {
+      start();
+    }
+  });
+
+  /* ---------- offline / online ---------- */
+  window.addEventListener('offline', function () { show('offline', true); });
+  window.addEventListener('online', function () {
+    show('offline', false);
+    if (!hello) start();
+  });
+
+  /* ---------- install prompt (only in the browser, not inside the installed app) ---------- */
+  var SHARE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
+  function dismissed() { var t = Number(load('rs_install_dismiss') || 0); return Date.now() - t < 3 * 864e5; }
+  function banner(title, html, canInstall) {
+    if (standalone || dismissed()) return;
+    $('insT').textContent = title; $('insD').innerHTML = html;
+    $('insGo').style.display = canInstall ? '' : 'none';
+    show('install', true);
+  }
+  $('insX').onclick = function () { show('install', false); store('rs_install_dismiss', String(Date.now())); };
+  $('insGo').onclick = function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function () { deferredPrompt = null; show('install', false); });
+  };
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); deferredPrompt = e;
+    banner('ติดตั้งแอปสแกนใบเสร็จ', 'มีไอคอนบนหน้าจอ เปิดเต็มจอเหมือนแอปทั่วไป', true);
+  });
+  window.addEventListener('appinstalled', function () { show('install', false); });
+  setTimeout(function () {
+    if (standalone || deferredPrompt) return;
+    if (inApp) banner('เปิดในเบราว์เซอร์เพื่อติดตั้ง', 'แตะเมนู ⋯ แล้วเลือก <b>เปิดใน ' + (isIOS ? 'Safari' : 'Chrome') + '</b>', false);
+    else if (isIOS) banner('ติดตั้งบน iPhone / iPad', 'แตะ ' + SHARE_ICON + ' <b>แชร์</b> แล้วเลือก <b>เพิ่มไปยังหน้าจอโฮม</b>', false);
+    else if (isAndroid) banner('ติดตั้งแอปสแกนใบเสร็จ', 'แตะเมนู ⋮ แล้วเลือก <b>ติดตั้งแอป</b> หรือ <b>เพิ่มลงในหน้าจอหลัก</b>', false);
+  }, 3500);
+
+  /* ---------- offline cache for this small shell ---------- */
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(function () { });
+  }
+
+  start();
+})();
+</script>
+</body>
+</html>

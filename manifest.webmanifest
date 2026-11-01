@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "Receipt Scanner - สแกนใบเสร็จ",
+  "short_name": "สแกนใบเสร็จ",
+  "description": "สแกนใบเสร็จด้วย AI จัดเก็บตามบริษัท งาน ประเภท และสรุปยอดรวม",
+  "lang": "th",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#4F46E5",
+  "theme_color": "#F4F6FB",
+  "categories": ["finance", "productivity", "business"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
