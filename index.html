@@ -38,6 +38,17 @@ body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:env(safe-ar
 .btn.ghost{background:rgba(255,255,255,.16);color:#fff}
 #slowHint{display:none}
 
+/* shown when the Apps Script page loads but never answers: reveal the real page underneath */
+.diag{position:fixed;z-index:25;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);display:none;background:#0F172A;color:#E2E8F0;
+  border-radius:16px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.35);font-size:13.5px;line-height:1.55;max-width:560px;margin:0 auto}
+.diag.on{display:block}
+.diag b{color:#fff}
+.diag .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.diag button,.diag a{flex:1;min-width:90px;padding:9px 10px;border-radius:10px;border:0;font:600 13px Kanit,sans-serif;cursor:pointer;text-align:center;text-decoration:none}
+.diag .p{background:#fff;color:#4F46E5}.diag .g{background:rgba(255,255,255,.12);color:#fff}
+.diag ol{margin:10px 0 0 18px;display:none}.diag ol.on{display:block}
+.diag li{margin-bottom:6px}.diag code{background:rgba(255,255,255,.12);padding:1px 5px;border-radius:5px;font-size:12px;word-break:break-all}
+
 /* install banner */
 .install{position:fixed;z-index:30;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);display:none;align-items:center;gap:12px;
   padding:12px 12px 12px 14px;border-radius:18px;background:#fff;box-shadow:0 12px 40px rgba(15,23,42,.25);border:1px solid #E2E8F0;max-width:520px;margin:0 auto;animation:drop .3s ease}
@@ -79,6 +90,17 @@ body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:env(safe-ar
   <p>เปิดไฟล์ <code>config.js</code> แล้วใส่ Web App URL ของ Apps Script<br>(ลงท้ายด้วย <code>/exec</code>) ในช่อง <code>gasUrl</code></p>
 </div>
 
+<div class="diag" id="diag">
+  <div>⚠️ <b>แอปไม่ตอบสนอง</b> — ด้านบนคือหน้าที่ Google ส่งกลับมาจาก Web App URL</div>
+  <ol id="diagList">
+    <li>วาง <b>Code.gs, Index.html, appsscript.json v2.0</b> แล้วหรือยัง</li>
+    <li>Deploy → Manage deployments → ✏️ Edit → Who has access: <b>Anyone</b> → Version: <b>New version</b> → Deploy</li>
+    <li><code>gasUrl</code> ใน config.js ต้องเป็น URL ของ deployment นั้น ลงท้าย <b>/exec</b>:<br><code id="diagUrl"></code></li>
+    <li>ลองกด "เปิดลิงก์ตรง" — ถ้าเห็นหน้าใส่ PIN แปลว่า Apps Script ถูกต้อง ให้กดลองใหม่</li>
+  </ol>
+  <div class="row"><button class="p" onclick="RS.reload()">ลองใหม่</button><a class="g" id="diagOpen" target="_blank" rel="noopener">เปิดลิงก์ตรง</a><button class="g" onclick="document.getElementById('diagList').classList.toggle('on')">วิธีแก้</button></div>
+</div>
+
 <div class="install" id="install">
   <img src="icon-192.png" alt="">
   <div class="sp"><div class="t" id="insT">ติดตั้งแอปสแกนใบเสร็จ</div><div class="d" id="insD"></div></div>
@@ -95,7 +117,7 @@ body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:env(safe-ar
   var ORIGIN_RE = /^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/;   // where the Apps Script page runs
   var extra = C.extraOrigins || [];
   var $ = function (id) { return document.getElementById(id); };
-  var frame = $('frame'), loaded = false, hello = false, slowTimer = null, deferredPrompt = null;
+  var frame = $('frame'), loaded = false, hello = false, slowTimer = null, diagTimer = null, deferredPrompt = null;
 
   function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } }
   function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -114,13 +136,23 @@ body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:env(safe-ar
     var url = String(C.gasUrl || '').trim();
     if (!GAS_RE.test(url) && !C.allowAnyUrl) { show('splash', false); show('notConfigured', true); return; }
     if (!navigator.onLine) { show('splash', false); show('offline', true); return; }
-    show('offline', false); show('splash', true); $('slowHint').style.display = 'none';
-    hello = false; loaded = false;
+    show('offline', false); show('splash', true); show('diag', false); $('slowHint').style.display = 'none';
+    $('diagUrl').textContent = url; $('diagOpen').href = url;
+    hello = false; loaded = false; clearTimeout(diagTimer);
     frame.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 'app=pwa&t=' + Date.now();
     clearTimeout(slowTimer);
     slowTimer = setTimeout(function () { if (!hello) $('slowHint').style.display = 'block'; }, 20000);
   }
-  frame.addEventListener('load', function () { loaded = true; });
+  frame.addEventListener('load', function () {
+    if (!frame.getAttribute('src')) return;
+    loaded = true;
+    // The page arrived but the app did not say hello: show what Google actually returned
+    clearTimeout(diagTimer);
+    diagTimer = setTimeout(function () {
+      if (hello) return;
+      clearTimeout(slowTimer); show('splash', false); show('diag', true);
+    }, 7000);
+  });
   window.RS = { reload: start };
 
   /* ---------- talk to the app inside the frame ---------- */
@@ -129,7 +161,7 @@ body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:env(safe-ar
     if (!trusted(e.origin)) return;
     var d = e.data || {};
     if (d.type === 'rs-hello') {
-      hello = true; clearTimeout(slowTimer); show('splash', false);
+      hello = true; clearTimeout(slowTimer); clearTimeout(diagTimer); show('splash', false); show('diag', false);
       e.source.postMessage({ type: 'rs-shell', v: 1, token: load(TOKEN_KEY), standalone: standalone, ios: isIOS, android: isAndroid }, e.origin);
     } else if (d.type === 'rs-token') {
       store(TOKEN_KEY, d.token || null);

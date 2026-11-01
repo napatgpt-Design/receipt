@@ -4,7 +4,7 @@
  * offline screen. All receipt data comes live from Google Apps Script and is
  * never cached here. Bump SHELL_VERSION when you change any file in this folder.
  */
-var SHELL_VERSION = 'rs-shell-v2.0.0';
+var SHELL_VERSION = 'rs-shell-v2.0.1';
 var ASSETS = [
   './',
   'index.html',
